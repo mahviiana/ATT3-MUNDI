@@ -1,0 +1,353 @@
+---
+title: "Evolução das Taxas de Juros de Empréstimos no Mundo"
+format: html
+editor: visual
+---
+
+```{r setup, include=FALSE}
+#| echo: false
+#| message: false
+#| warning: false
+
+# Evita erro com PNG e limita tamanho das imagens
+options(bitmapType = "cairo", ragg.max_dim = 10000)
+knitr::opts_chunk$set(dev = "ragg_png", dpi = 96)
+
+# Pacotes
+library(tidyverse)
+library(WDI)
+library(gganimate)
+library(sf)
+library(rnaturalearth)
+library(gifski)
+library(viridis)
+library(countrycode)
+library(ragg)
+```
+
+Desenvolvido por: Gabriela Froehlich, Lara Theiss, Luana Gnewuch, Maria Viana
+
+## **Introdução**
+
+As **taxas de juros de empréstimos** são uma variável fundamental para o desenvolvimento econômico, pois influenciam diretamente o acesso ao crédito, a capacidade de investimento das empresas e o consumo das famílias. Compreender sua evolução entre 2010 e 2022 é essencial para analisar como diferentes países e regiões enfrentam desafios financeiros. Este estudo utiliza dados do Banco Mundial 📊🌍 para apresentar essa trajetória global.\[\@worldbank2023\].
+
+### 📜 **História e Importância da Variável**
+
+A **taxa de juros de empréstimos** tem raízes antigas na história econômica, desde quando o dinheiro começou a ser emprestado para fomentar atividades comerciais e produtivas. Inicialmente, ela surgiu como uma forma de remunerar o capital emprestado, cobrindo riscos e incentivando o fluxo financeiro entre agentes econômicos 💰.
+
+Com o avanço dos sistemas financeiros e a criação dos bancos centrais, a taxa de juros ganhou papel estratégico como **instrumento de política monetária**. Desde o século XX, especialmente após a Grande Depressão e as crises inflacionárias das décadas de 1970 e 1980, os bancos centrais passaram a ajustar as taxas para controlar a inflação, estimular o crescimento econômico ou frear bolhas financeiras 📉🔥.
+
+No contexto atual, essa taxa é influenciada por diversos fatores que vão além do simples custo do dinheiro. Ela reflete a confiança do mercado na economia de um país, sua estabilidade política, o risco de crédito e até as condições globais de financiamento. Em outras palavras, é um termômetro do equilíbrio econômico e da percepção de risco para quem empresta ou toma dinheiro emprestado 🌍⚖️.
+
+O indicador *lending interest rate* (código **FR.INR.LEND** no Banco Mundial) mensura exatamente a taxa média cobrada pelos bancos comerciais em novos empréstimos, ou seja, o custo real que empresas e famílias enfrentam para conseguir crédito no dia a dia bancário. Esse valor pode variar amplamente dependendo do grau de desenvolvimento do país, das garantias exigidas, da concorrência entre instituições financeiras e da qualidade das políticas econômicas locais 🏦💡.
+
+Essa variável é fundamental para entender ciclos econômicos: quando os juros sobem demais, o crédito fica caro e o consumo cai, freando a economia. Quando estão baixos, o crédito se torna mais acessível, estimulando investimentos, emprego e renda. Porém, taxas muito baixas podem causar excessos, como bolhas no mercado imobiliário ou no setor financeiro, que podem levar a crises graves, como a de 2008 💥⚠️.
+
+Portanto, a taxa de juros de empréstimos é muito mais que um número — é um elo vital entre as decisões de política econômica, o comportamento dos mercados e o cotidiano das pessoas e empresas.
+
+### 🎯 **Para que é Utilizada**
+
+A **taxa de juros de empréstimos** é uma informação essencial para vários atores econômicos — desde governos até investidores e famílias — porque ajuda a compreender as condições e os desafios do mercado de crédito em cada país.
+
+Governos e bancos centrais utilizam essa variável para:
+
+-    **Planejar e ajustar políticas monetárias e fiscais** que mantenham a economia estável e favoreçam o crescimento sustentável 📊📈;
+
+-   **Avaliar o ambiente financeiro e o grau de risco econômico**, definindo estratégias para atrair investimentos e proteger o sistema financeiro 🛡️💼.
+
+Investidores e instituições financeiras usam as taxas para:
+
+-   **Calcular o custo do dinheiro e o retorno esperado nos empréstimos**, ajudando a tomar decisões seguras e rentáveis 💰📉;
+
+-   **Comparar o potencial econômico e o risco entre países e regiões**, facilitando escolhas mais informadas em investimentos globais 🌍💡.
+
+Empresas e famílias acompanham essas taxas para:
+
+-    **Planejar financiamentos, investimentos e consumo**, entendendo quando é vantajoso tomar crédito e como isso afeta seu orçamento pessoal ou corporativo 💳🏢;
+
+-   **Compreender o custo real do crédito**, evitando endividamentos que possam comprometer sua saúde financeira.
+
+No contexto de estudos e análises econômicas, como o deste trabalho, a taxa de juros de empréstimos é uma ferramenta valiosa para:
+
+-   **Visualizar desigualdades regionais no acesso ao crédito**, que impactam diretamente o desenvolvimento econômico e social 🚧🌐;
+
+-   **Refletir sobre os desafios enfrentados por países em desenvolvimento**, que muitas vezes lidam com juros elevados, dificultando o crescimento e a inclusão financeira 🤝⚠️.
+
+Assim, essa variável não é apenas um número estatístico, mas uma peça chave para entender e influenciar o funcionamento da economia em múltiplos níveis.
+
+## 🗺️ **Mapa Mundial Animado**
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+# Dados
+juros <- WDI(indicator = "FR.INR.LEND", start = 2010, end = 2022, extra = TRUE) %>%
+  rename(taxa_juros = FR.INR.LEND) %>%
+  filter(!is.na(taxa_juros), region != "Aggregates") %>%
+  mutate(
+    iso3c = countrycode(iso2c, "iso2c", "iso3c"),
+    pais = countrycode(iso2c, "iso2c", "country.name")
+  )
+
+world <- ne_countries(scale = "small", returnclass = "sf") %>%
+  select(iso_a3, geometry)
+
+dados_mapa <- inner_join(world, juros, by = c("iso_a3" = "iso3c"))
+
+# Animação do mapa
+mapa_animado <- ggplot(dados_mapa) +
+  geom_sf(aes(fill = taxa_juros), color = NA) +
+  scale_fill_viridis(option = "plasma", name = "Taxa de Juros (%)") +
+  labs(
+    title = "Ano: {frame_time}",
+    fill = "Taxa de Juros (%)"
+  ) +
+  theme_minimal(base_size = 32) +
+  theme(
+    plot.title = element_text(size = 85, face = "bold", hjust = 0.5),  # TÍTULO DO ANO MAIOR
+    legend.title = element_text(size = 70, face = "bold"),
+    legend.text = element_text(size = 60),
+    legend.key.height = unit(5, "cm"),
+    legend.key.width = unit(2.5, "cm"),
+    legend.position = "right"
+  ) +
+  transition_time(year) +
+  ease_aes("linear")
+
+animate(
+  mapa_animado,
+  nframes = 26,
+  fps = 2,
+  width = 70,
+  height = 50,
+  res = 10,
+  renderer = gifski_renderer("mapa.gif")
+)
+```
+
+### 🌍 **Mapa Mundial Animado – Evolução das Taxas de Juros (2010–2022)**
+
+Este mapa animado mostra a distribuição global das **taxas de juros de empréstimos** entre 2010 e 2022. Cada país é colorido conforme a intensidade da taxa, permitindo observar tanto diferenças regionais quanto mudanças ao longo do tempo.
+
+🔹 **Tons claros indicam taxas mais baixas**, típicas de economias desenvolvidas e financeiramente estáveis.\
+🔸 **Tons escuros representam taxas mais altas**, geralmente encontradas em países com maiores riscos macroeconômicos.
+
+O gráfico evidencia desigualdades marcantes no custo do crédito. Regiões como a **Europa Ocidental**, **América do Norte** e **Leste Asiático** mantêm juros baixos durante todo o período, favorecendo o crescimento via consumo e investimento. Já países da **América Latina**, **África Subsaariana** e algumas nações da **Ásia Central** exibem taxas persistentemente elevadas, reflexo de:
+
+-   Inflação estrutural 📈
+
+-   Instabilidade política e fiscal ⚠️
+
+-   Baixa confiança no sistema bancário 🏦
+
+Ao acompanhar a evolução ano a ano, o mapa também permite identificar momentos de choque ou transição, como crises econômicas, reformas monetárias ou ajustes cambiais. Ele traduz visualmente **como o ambiente de crédito está fortemente vinculado à estabilidade econômica de cada país**.
+
+## Top 10 Países com as Maiores Taxas de Juros 🚩💰
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+top_juros <- juros %>%
+  group_by(year) %>%
+  slice_max(taxa_juros, n = 10) %>%
+  mutate(rank = row_number())
+
+anim_barras <- ggplot(top_juros, aes(x = rank, y = taxa_juros, fill = pais)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top 10 Taxas de Juros em {closest_state}",
+    y = "Taxa (%)",
+    x = NULL,
+    fill = "País"
+  ) +
+  theme_minimal(base_size = 32) +
+  theme(
+    plot.title = element_text(size = 85, face = "bold", hjust = 0.5),  # TÍTULO DO ANO MAIOR
+    legend.title = element_text(size = 70, face = "bold"),
+    legend.text = element_text(size = 60),
+    legend.key.height = unit(5, "cm"),
+    legend.key.width = unit(2.5, "cm"),
+    legend.position = "right"
+  ) +
+  transition_states(year, transition_length = 1, state_length = 1)
+
+animate(
+  anim_barras,
+  nframes = 24,
+  fps = 6,
+  width = 70,
+  height = 50,
+  res = 10,
+  renderer = gifski_renderer("top10.gif")
+)
+```
+
+### 📊 **Gráfico de Barras Animado – Top 10 Países com Maiores Taxas**
+
+Este gráfico mostra, de forma animada, os **10 países com as maiores taxas de juros de empréstimos a cada ano** entre 2010 e 2022. A posição das barras muda com o tempo, revelando quem lidera esse ranking em diferentes momentos.
+
+Os países que mais aparecem no topo incluem:\
+🇿🇼 **Zimbábue** – com histórico de hiperinflação e crises cambiais;\
+🇦🇷 **Argentina** – marcada por instabilidade fiscal e recorrentes crises financeiras;\
+🇸🇷 **Suriname** e 🇱🇧 **Líbano** – que enfrentam desequilíbrios estruturais profundos.
+
+📌 Em vez de representar crescimento econômico, essas altas taxas refletem **tentativas de conter inflação e fuga de capitais**. Elas acabam dificultando o acesso ao crédito, travando investimentos produtivos e afetando diretamente o bem-estar das famílias.
+
+A animação também evidencia flutuações ao longo dos anos — alguns países entram e saem da lista conforme políticas monetárias, crises políticas ou mudanças no cenário internacional afetam seus indicadores internos.
+
+Esse gráfico nos ajuda a entender que **taxas elevadas, muitas vezes, são um sintoma de fragilidade econômica**, e não um sinal de desenvolvimento.
+
+## Panorama das Taxas de Juros por Região 📈🌏 
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+juros %>%
+  group_by(region) %>%
+  summarise(
+    Média = round(mean(taxa_juros, na.rm = TRUE), 1),
+    Mediana = round(median(taxa_juros, na.rm = TRUE), 1),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(Média)) %>%
+  knitr::kable(caption = "Estatísticas das Taxas de Juros por Região")
+```
+
+### 📈 **Tabela – Estatísticas das Taxas de Juros por Região**
+
+Esta tabela resume as **médias e medianas das taxas de juros de empréstimos** por região do mundo entre 2010 e 2022, oferecendo uma visão quantitativa e comparativa do fenômeno.
+
+-    🧮 **Média**: mostra o valor médio da taxa de juros na região, mas pode ser distorcida por casos extremos.
+
+-    📏 **Mediana**: representa o valor central, ideal para entender a realidade “típica” da maioria dos países em cada grupo.
+
+🔺 Regiões como a **América Latina e Caribe** e a **África Subsaariana** apresentam os maiores valores — reforçando os obstáculos enfrentados por essas economias no acesso a crédito acessível.\
+🔻 Já a **Europa** e a **América do Norte** destacam-se com as menores taxas, o que favorece investimentos, inovação e consumo interno.
+
+Essa desigualdade no custo do crédito revela como as condições macroeconômicas regionais impactam diretamente as oportunidades de crescimento. Em economias com juros altos, empresas enfrentam maiores barreiras para expandir e as famílias têm menos capacidade de consumo — o que perpetua ciclos de baixo desenvolvimento.
+
+💡 Por isso, entender esses dados é fundamental para pensar em **soluções que ampliem o acesso ao crédito, fortaleçam instituições financeiras e promovam inclusão econômica ao redor do mundo**.
+
+### 🧠 Discussão Geral
+
+Este trabalho buscou analisar a evolução das taxas de juros de empréstimos no mundo entre 2010 e 2022, com o objetivo de entender suas dinâmicas globais, diferenças regionais e os determinantes econômicos que influenciam o custo do crédito.
+
+### 🎯 Contribuição do Estudo
+
+A principal contribuição deste estudo é oferecer uma visão comparativa internacional, didática e visualmente acessível sobre uma variável macroeconômica essencial, mas muitas vezes tratada de forma isolada em contextos nacionais: a taxa de juros de empréstimos.
+
+Por meio de visualizações animadas e análises estatísticas, o trabalho permite que o leitor compreenda:
+
+-   Como as taxas de juros se distribuem geograficamente;
+
+-   Quais países enfrentam os maiores custos para obtenção de crédito;
+
+-   Quais regiões mantêm estabilidade financeira ao longo do tempo;
+
+E de que forma isso afeta o crescimento econômico, o investimento e a inclusão financeira.
+
+### ⚖️ Argumentos a Favor e Contra a Interpretação dos Resultados
+
+✅ **Argumentos a favor:**
+
+As taxas de juros são de fato um indicador sólido da confiança econômica e do risco percebido por instituições financeiras.
+
+O uso de dados anuais e globais do Banco Mundial permite comparações consistentes e confiáveis.
+
+A divisão por regiões oferece um panorama mais estruturado e evita análises enviesadas por países com extremos estatísticos.
+
+A visualização animada permite identificar tendências e choques, como crises econômicas ou momentos de estabilidade.
+
+❌ **Argumentos contra:**
+
+As taxas de juros analisadas representam valores médios nominais e não consideram correções por inflação — o que pode distorcer a comparação real entre países.
+
+Os dados do Banco Mundial podem não refletir a taxa real paga por diferentes perfis de consumidores dentro de um mesmo país (ex: grandes empresas vs. consumidores informais).
+
+A análise não inclui variáveis complementares, como nível de bancarização, qualidade do sistema jurídico, ou políticas de microcrédito, que também influenciam o acesso ao crédito.
+
+Esses limites, embora relevantes, não invalidam o estudo, mas indicam que ele deve ser lido como um retrato geral e não uma avaliação isolada de desempenho econômico.
+
+### 🧪 Determinantes Empíricos das Taxas de Juros
+
+A literatura econômica aponta diversos fatores que explicam a variação das taxas de juros entre países. Este estudo se baseia implicitamente nesses determinantes para interpretar os dados:
+
+-   Inflação: Países com inflação mais alta tendem a praticar juros mais elevados, para proteger o valor real do dinheiro emprestado.
+
+-   Risco-país e estabilidade institucional: Quanto maior o risco de calote ou instabilidade política, maior a taxa cobrada pelos bancos.
+
+-   Política monetária: Taxas básicas definidas pelos bancos centrais impactam diretamente os juros praticados pelos bancos comerciais.
+
+-   Concorrência bancária e eficiência do sistema financeiro: Mercados mais competitivos tendem a oferecer crédito com menores spreads.
+
+-   Acesso ao mercado internacional de capitais: Países com acesso facilitado a capitais externos conseguem manter taxas mais baixas internamente.
+
+Esses fatores atuam em conjunto e ajudam a explicar por que as taxas variam tanto entre regiões, mesmo em anos economicamente estáveis.
+
+### 🧰 Metodologia Utilizada
+
+A metodologia adotada é quantitativa, descritiva e comparativa, composta pelas seguintes etapas:
+
+-   Coleta de dados secundários diretamente da base do Banco Mundial, por meio do pacote WDI no R.
+
+-   Tratamento e padronização dos dados, excluindo agregações regionais e países sem dados completos.
+
+-   Conversão dos códigos dos países para padrões ISO3 (para compatibilização com mapas geográficos).
+
+Construção de visualizações dinâmicas:
+
+-   Mapa animado com gganimate para observar a evolução geográfica no tempo.
+
+-   Gráfico de barras animado para acompanhar os top 10 países por ano.
+
+-   Tabela estatística por região, com média e mediana das taxas.
+
+-   Análise crítica e interpretação econômica com base na literatura e em fatores estruturais de cada região.
+
+Essa abordagem permite unir análise econômica com comunicação visual, facilitando o entendimento tanto por especialistas quanto por leitores leigos.
+
+### 📊 Origem dos Dados
+
+Todos os dados utilizados foram extraídos da base oficial do Banco Mundial, através do código de indicador FR.INR.LEND, que corresponde à "Lending Interest Rate", ou taxa de juros média praticada por instituições financeiras em novos empréstimos.
+
+Os dados são atualizados anualmente, padronizados para fins de comparação internacional, e foram acessados diretamente com a função WDI() no R, garantindo transparência, reprodutibilidade e confiabilidade metodológica.
+
+### ✅ **Conclusão**
+
+A análise da evolução das **taxas de juros de empréstimos no mundo entre 2010 e 2022** evidencia como essa variável macroeconômica é não apenas um reflexo da saúde financeira de um país, mas também um fator determinante do seu potencial de crescimento, estabilidade e inclusão social.
+
+Os dados revelam uma clara **assimetria global no custo do crédito**. Enquanto países desenvolvidos mantêm taxas consistentemente baixas, criando ambientes favoráveis ao investimento e ao consumo, muitas economias em desenvolvimento enfrentam juros elevados, que restringem o acesso ao crédito e limitam o dinamismo econômico.
+
+As visualizações criadas — mapa mundial animado, gráfico de barras e tabela estatística — mostraram com clareza:
+
+-    A **persistência de desigualdades** entre regiões;
+
+-   A **volatilidade das taxas em países com instabilidade institucional**;
+
+-   E a **relação entre risco macroeconômico e custo do dinheiro**.
+
+Apesar das limitações, como a ausência de dados inflacionários ou informações sobre o sistema financeiro interno de cada país, o estudo reforça a importância de políticas que busquem **reduzir o risco sistêmico**, fortalecer a governança econômica e ampliar o acesso a crédito em condições justas.
+
+Mais do que um número, a taxa de juros de empréstimos representa uma **ponte ou uma barreira**: quando equilibrada, estimula a atividade econômica e promove o desenvolvimento; quando excessiva, afasta oportunidades, aumenta desigualdades e perpetua ciclos de exclusão.
+
+Por isso, compreender suas dinâmicas globais não é apenas um exercício técnico, mas um passo essencial para construir **economias mais resilientes, acessíveis e justas**.
+
+### 📚 **Referências – Formato ABNT**
+
+FEYEN, Erik; ZUCCARDI, Igor. *Bank lending rates and spreads in EMDEs: evolution, drivers, and policies*. World Bank Policy Working Paper, 2020. Disponível em: <https://blogs.worldbank.org>. Acesso em: 22 jun. 2025.
+
+MISHRA, Prachi et al. *Monetary Policy and Bank Lending in Developing Countries: Loan Applications, Rates, and Real Effects*. 2014. Disponível em: <https://www.researchgate.net>. Acesso em: 22 jun. 2025.
+
+MORA, Y. *Transmission of monetary policy in Indonesia*. *Finance*, MDPI, v. 11, n. 2, 2023. DOI: 10.3390/finance11020056.
+
+DAS, Sonali. *Monetary Policy in India: Transmission to Bank Interest Rates*. IMF Working Paper No. 2015/129. Washington, D.C.: International Monetary Fund, 2015. Disponível em: <https://www.imf.org>. Acesso em: 22 jun. 2025.
+
+WORLD BANK; INTERNATIONAL MONETARY FUND. *Glossário e metodologia da variável FR.INR.LEND*. World Development Indicators, 2025. Disponível em: <https://databank.worldbank.org>. Acesso em: 22 jun. 2025.
+
+REY, Hélène. “Dilemma not Trilemma: The Global Financial Cycle and Monetary Policy Independence”. *Jackson Hole Economic Symposium Proceedings*, 2013. Disponível em: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2408297. Acesso em: 23 jun. 2025.
